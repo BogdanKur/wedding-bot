@@ -1,0 +1,22 @@
+# Environment variables
+.env
+.env.local
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Runtime data
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Package manager files
+package-lock.json
+yarn.lock
