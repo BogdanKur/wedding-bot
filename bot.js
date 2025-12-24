@@ -3,7 +3,7 @@ const { Telegraf } = require('telegraf');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const WEBAPP_URL = 'https://promaxsvadba.ru';
-const ADMIN_ID = 1341703642; // ⚠️ ТВОЙ РЕАЛЬНЫЙ TELEGRAM ID (цифры)
+const ADMIN_ID = 971702774; // ⚠️ ТВОЙ РЕАЛЬНЫЙ TELEGRAM ID (цифры)
 
 if (!BOT_TOKEN) {
   console.error('ERROR: Укажите BOT_TOKEN в .env');
@@ -301,3 +301,4 @@ bot.launch()
 // Graceful shutdown
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
