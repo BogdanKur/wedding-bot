@@ -12,8 +12,8 @@ if (!BOT_TOKEN) {
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// Храним ID пользователей, которые открыли WebApp
-const webAppUsers = new Set();
+// Хранилище для отслеживания пользователей
+const userResponses = new Map();
 
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
@@ -21,6 +21,14 @@ bot.start(async (ctx) => {
   
   console.log(`🚀 Пользователь ${username} (${userId}) начал диалог`);
   
+  // Сбрасываем предыдущие ответы
+  userResponses.set(userId, {
+    hasResponded: false,
+    answer: null,
+    timestamp: null
+  });
+  
+  // Первое сообщение с кнопкой WebApp
   await ctx.reply(
     `👋 Привет, ${ctx.from.first_name || 'дорогой друг'}!\n\n` +
     'Мы приглашаем тебя на нашу свадьбу! ❤️\n' +
@@ -38,67 +46,25 @@ bot.start(async (ctx) => {
       }
     }
   );
-  
-  // Запоминаем, что пользователь начал диалог
-  webAppUsers.add(userId);
-});
 
-// ОБЯЗАТЕЛЬНЫЙ ОБРАБОТЧИК ДЛЯ ДАННЫХ ИЗ WEBAPP
-bot.on('message', async (ctx) => {
-  // Проверяем, есть ли данные из WebApp
-  if (ctx.message.web_app_data) {
-    const userId = ctx.from.id;
-    const data = ctx.message.web_app_data.data;
-    
-    console.log(`📨 Данные из WebApp от ${userId}:`, data);
-    
-    try {
-      // Парсим JSON данные
-      const parsedData = JSON.parse(data);
-      console.log('📊 Parsed data:', parsedData);
-      
-      // Показываем вопрос о посещении
-      await askAttendanceQuestion(ctx);
-      
-    } catch (error) {
-      console.error('❌ Ошибка парсинга данных:', error);
-      // Все равно показываем вопрос
-      await askAttendanceQuestion(ctx);
-    }
-    
-    return;
-  }
-  
-  // Обычные текстовые сообщения
-  console.log(`💬 Сообщение от ${ctx.from.username}:`, ctx.message.text);
-});
-
-// Команда для ручной отправки приглашения
-bot.command('invite', async (ctx) => {
-  await ctx.reply(
-    'Открыть свадебное приглашение:',
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: "✨ Открыть приглашение",
-              web_app: { url: WEBAPP_URL }
-            }
-          ]
-        ]
-      }
-    }
-  );
-  webAppUsers.add(ctx.from.id);
+  // Сразу отправляем второй вопрос с кнопками Да/Нет
+  setTimeout(async () => {
+    await askAttendanceQuestion(ctx);
+  }, 500); // Ждем 0.5 секунды перед отправкой
 });
 
 // Функция для вопроса о посещении
 async function askAttendanceQuestion(ctx) {
   const userId = ctx.from.id;
-  const username = ctx.from.username || `user_${userId}`;
+  const userData = userResponses.get(userId);
   
-  console.log(`❓ Задаю вопрос о посещении пользователю ${username}`);
+  // Проверяем, не ответил ли уже пользователь
+  if (userData && userData.hasResponded) {
+    console.log(`ℹ️ Пользователь ${userId} уже ответил`);
+    return;
+  }
+  
+  console.log(`❓ Задаю вопрос о посещении пользователю ${userId}`);
   
   await ctx.reply(
     '🎉 *Ты придешь на нашу свадьбу?*\n\n' +
@@ -130,7 +96,21 @@ bot.action('attendance_yes', async (ctx) => {
   const user = ctx.from;
   const userId = user.id;
   
+  // Проверяем, не отвечал ли уже
+  const userData = userResponses.get(userId);
+  if (userData && userData.hasResponded) {
+    await ctx.answerCbQuery('Вы уже ответили ранее!');
+    return;
+  }
+  
   console.log(`✅ Пользователь ${user.username || userId} ответил ДА`);
+  
+  // Сохраняем ответ
+  userResponses.set(userId, {
+    hasResponded: true,
+    answer: 'ДА',
+    timestamp: new Date()
+  });
   
   // Ответ пользователю
   await ctx.reply(
@@ -150,7 +130,21 @@ bot.action('attendance_no', async (ctx) => {
   const user = ctx.from;
   const userId = user.id;
   
+  // Проверяем, не отвечал ли уже
+  const userData = userResponses.get(userId);
+  if (userData && userData.hasResponded) {
+    await ctx.answerCbQuery('Вы уже ответили ранее!');
+    return;
+  }
+  
   console.log(`❌ Пользователь ${user.username || userId} ответил НЕТ`);
+  
+  // Сохраняем ответ
+  userResponses.set(userId, {
+    hasResponded: true,
+    answer: 'НЕТ',
+    timestamp: new Date()
+  });
   
   // Ответ пользователю
   await ctx.reply(
@@ -174,7 +168,8 @@ async function sendAdminNotification(ctx, answer) {
     month: 'long',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    second: '2-digit'
   });
   
   const userInfo = user.username 
@@ -201,6 +196,71 @@ _Данные автоматически записаны_
     console.error('❌ Ошибка отправки админу:', error.message);
   }
 }
+
+// Команда для ручной отправки вопроса
+bot.command('question', async (ctx) => {
+  await askAttendanceQuestion(ctx);
+});
+
+// Команда для отправки приглашения
+bot.command('invite', async (ctx) => {
+  const userId = ctx.from.id;
+  
+  // Сбрасываем ответы
+  userResponses.delete(userId);
+  
+  await ctx.reply(
+    'Открыть свадебное приглашение:',
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: "✨ Открыть приглашение",
+              web_app: { url: WEBAPP_URL }
+            }
+          ]
+        ]
+      }
+    }
+  );
+  
+  // И сразу вопрос
+  setTimeout(async () => {
+    await askAttendanceQuestion(ctx);
+  }, 500);
+});
+
+// Показываем статистику по ответам
+bot.command('stats', async (ctx) => {
+  if (ctx.from.username !== 'ShitshiBB') { // Замени на свой юзернейм
+    return ctx.reply('Эта команда только для администратора');
+  }
+  
+  const totalUsers = userResponses.size;
+  const yesAnswers = Array.from(userResponses.values()).filter(r => r.answer === 'ДА').length;
+  const noAnswers = Array.from(userResponses.values()).filter(r => r.answer === 'НЕТ').length;
+  const pending = totalUsers - yesAnswers - noAnswers;
+  
+  await ctx.reply(
+    `📊 *Статистика ответов:*\n\n` +
+    `👥 Всего пользователей: ${totalUsers}\n` +
+    `✅ Придут: ${yesAnswers}\n` +
+    `❌ Не придут: ${noAnswers}\n` +
+    `⏳ Не ответили: ${pending}`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// Обработчик данных из WebApp
+bot.on('message', async (ctx) => {
+  if (ctx.message.web_app_data) {
+    console.log('📨 Данные из WebApp:', ctx.message.web_app_data.data);
+    // Если пришли данные, тоже показываем вопрос
+    await askAttendanceQuestion(ctx);
+    return;
+  }
+});
 
 // Запуск бота
 bot.launch()
