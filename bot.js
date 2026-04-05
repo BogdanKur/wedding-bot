@@ -2,7 +2,7 @@ require('dotenv').config();
 const { Telegraf } = require('telegraf');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const WEBAPP_URL = 'https://promaxsvadba.ru';
+const WEBAPP_URL = 'https://promaxxsvadba.ru';
 const ADMIN_ID = 971702774; // ⚠️ ТВОЙ РЕАЛЬНЫЙ TELEGRAM ID (цифры)
 
 if (!BOT_TOKEN) {
